@@ -6,7 +6,6 @@ Author: Gergely Soti, adapted by Bjoern Hein
 License is based on Creative Commons: Attribution-NonCommercial 4.0 International (CC BY-NC 4.0) (pls. check: http://creativecommons.org/licenses/by-nc/4.0/)
 """
 from IPPlanarManipulator import PlanarJoint, PlanarRobot
-from IPEnvironment import CollisionChecker
 from shapely.geometry import Point, Polygon, LineString
 from shapely import plotting
 import numpy as np
@@ -26,6 +25,38 @@ def interpolate_line(startPos, endPos, step_l):
     if not (c_step == np.array(endPos)).all():
         steps.append(np.array(endPos))
     return steps
+
+
+class CollisionChecker(object):
+
+    def __init__(self, scene, limits=[[0.0, 22.0], [0.0, 22.0]], statistic=None):
+        self.scene = scene
+        self.limits = limits
+
+    def getDim(self):
+        return 2
+
+    def getEnvironmentLimits(self):
+        return list(self.limits)
+
+    def pointInCollision(self, pos):
+        assert (len(pos) == self.getDim())
+        for key, value in self.scene.items():
+            if value.intersects(Point(pos[0], pos[1])):
+                return True
+        return False
+
+    def lineInCollision(self, startPos, endPos):
+        assert (len(startPos) == self.getDim())
+        assert (len(endPos) == self.getDim())
+        for key, value in self.scene.items():
+            if value.intersects(LineString([startPos, endPos])):
+                return True
+        return False
+
+    def drawObstacles(self, ax):
+        for key, value in self.scene.items():
+            plotting.plot_polygon(value, add_points=False, ax=ax)
 
 
 class KinChainCollisionChecker(CollisionChecker):

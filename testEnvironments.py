@@ -130,3 +130,16 @@ class TestEnvironments:
     def get_all_scenes(self):
         methods = [m for m in dir(self) if m.startswith("get_") and callable(getattr(self, m))]
         return {m: getattr(self, m)() for m in methods}
+
+    def create_environment(env_name="get_very_easy_1"):
+        """
+        Erzeugt eine Umgebung aus der Klasse TestEnvironments.
+        Übergabe z. B.: "get_easy_2", "get_medium_1", ...
+        """
+        envs = TestEnvironments()
+        if hasattr(envs, env_name):
+            content = getattr(envs, env_name)()
+            return CollisionChecker(content, limits=envs.limits)
+        else:
+            raise ValueError(f"Umgebung '{env_name}' nicht gefunden.")
+
