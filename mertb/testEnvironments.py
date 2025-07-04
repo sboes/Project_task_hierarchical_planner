@@ -1,11 +1,10 @@
 from shapely.geometry import Point, Polygon, LineString
 from shapely.affinity import rotate
 import matplotlib.pyplot as plt
-from Lectures.IPEnvironment import CollisionChecker
+from IPEnvironment import CollisionChecker
 
 
 class TestEnvironments:
-    benchList = list()
     def __init__(self, limits=[[0, 23], [0, 23]]):
         self.limits = limits
 
