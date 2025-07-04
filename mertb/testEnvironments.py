@@ -128,8 +128,12 @@ class TestEnvironments:
 
     # --- Zugriff auf alles ---
     def get_all_scenes(self):
-        methods = [m for m in dir(self) if m.startswith("get_") and callable(getattr(self, m))]
+        methods = [
+        m for m in dir(self)
+        if m.startswith("get_") and m != "get_all_scenes" and callable(getattr(self, m))
+        ]
         return {m: getattr(self, m)() for m in methods}
+
 
     def create_environment(env_name="get_very_easy_1"):
         """
