@@ -51,7 +51,7 @@ scene["maze3"] = LineString([(5, 9), (20, 9)]).buffer(0.6)
 scene["maze4"] = LineString([(5, 11), (20, 11)]).buffer(0.6)
 scene["walls"] = LineString([(0, 0), (0, 25)]).buffer(0.5).union(LineString([(25, 0), (25, 25)]).buffer(0.5))
 description = "Maze corridor with zig-zag lanes."
-benchList.append(Benchmark("Maze Corridor", CollisionChecker(scene), [[2, 2]], [[23, 23]], description, 4))
+benchList.append(Benchmark("Maze Corridor", CollisionChecker(scene), [[2, 2]], [[21, 21]], description, 4))
 
 # --- Benchmark 6: Diagonal Wall Detour ---
 scene = dict()
