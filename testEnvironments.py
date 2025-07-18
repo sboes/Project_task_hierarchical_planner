@@ -1,146 +1,84 @@
-from shapely.geometry import Point, Polygon, LineString
+from shapely.geometry import Polygon, LineString, Point
 from shapely.affinity import rotate
-import matplotlib.pyplot as plt
-from Lectures.IPEnvironment import CollisionChecker
 
+def env_1_trap():
+    obstacles = {
+        "trap_wall": LineString([(6, 18), (6, 8), (16, 8), (16,18)]).buffer(1.0)
+    }
+    start = (10.0, 15.0)
+    goal = (10.0, 1.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-class TestEnvironments:
-    benchList = list()
-    def __init__(self, limits=[[0, 23], [0, 23]]):
-        self.limits = limits
+def env_2_bottleneck():
+    obstacles = {
+        "left": LineString([(0, 13), (11, 13)]).buffer(0.5),
+        "right": LineString([(13, 13), (23,13)]).buffer(0.5)
+    }
+    start = (4.0, 15.0)
+    goal = (18.0, 1.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-    def draw_scene(self, content, figsize=(10, 10), title="Environment"):
-        """
-        Visualisiert die Szene über CollisionChecker.drawObstacles (wie in der Vorlesung).
-        """
-        checker = CollisionChecker(scene=content, limits=self.limits)
-        fig, ax = plt.subplots(figsize=figsize)
-        checker.drawObstacles(ax)
+def env_3_fat_bottleneck():
+    obstacles = {
+        "left": Polygon([(0, 8), (11, 8), (11, 15), (0, 15)]).buffer(0.5),
+        "right": Polygon([(13, 8), (24, 8), (24, 15), (13, 15)]).buffer(0.5)
+    }
+    start = (4.0, 21.0)
+    goal = (18.0, 1.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-        # Optional: Start/Ziel explizit markieren
-        if "start" in content:
-            start_center = content["start"].centroid
-            ax.plot(start_center.x, start_center.y, 'bo', markersize=12, label="Start")
-        if "goal" in content:
-            goal_center = content["goal"].centroid
-            ax.plot(goal_center.x, goal_center.y, 'ro', markersize=12, label="Ziel")
+def env_4_robot_shapes():
+    obstacles = {
+        "L": Polygon([(10, 16), (10, 11), (13, 11), (13,12), (11,12), (11,16)]),
+        "T": Polygon([(14,16), (14,15), (15,15), (15,11), (16,11), (16,15), (17,15), (17,16)]),
+        "C": Polygon([(19,16), (19,11), (22,11), (22,12), (20,12), (20,15), (22,15), (22,16)]),
+        "Antenna_L": Polygon([(3,12), (1,16), (2,16), (4,12)]),
+        "Antenna_Head_L": Point(1.5, 16).buffer(1),
+        "Antenna_R": Polygon([(7,12), (9,16), (8,16), (6,12)]),
+        "Antenna_Head_R": Point(8.5, 16).buffer(1),
+        "Robot_Head": Polygon([(2,13), (2,8), (8,8), (8,13)])
+    }
+    start = (4.0, 21.0)
+    goal = (18.0, 1.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-        ax.set_xlim(self.limits[0])
-        ax.set_ylim(self.limits[1])
-        ax.set_aspect('equal')
-        ax.set_title(title)
-        ax.grid(True)
-        ax.legend()
-        plt.show()
+def env_5_twist_gap():
+    bar = Polygon([(0, 0), (8, 0), (8, 1), (0, 1)])
+    rotated_bar = rotate(bar, 45, origin=(11, 11))
+    obstacles = {
+        "twist_bar": rotated_bar,
+        "block_right": Polygon([(15, 15), (19, 15), (19, 19), (15, 19)])
+    }
+    start = (2.0, 2.0)
+    goal = (21.0, 21.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-    # --- Very Easy ---
-    def get_very_easy_1(self):
-        return {
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
+def env_6_dense_walls():
+    obstacles = {}
+    for i in range(5, 21, 2):
+        obstacles[f"wall_{i}"] = Polygon([(i, 6), (i+1, 6), (i+1, 18), (i, 18)])
+    start = (2.0, 2.0)
+    goal = (22.0, 22.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-    def get_very_easy_2(self):
-        return {
-            "block": Polygon([(10, 10), (11, 10), (11, 11), (10, 11)]),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
+def env_7_micro_passages():
+    obstacles = {
+        "wide": Polygon([(5, 5), (19, 5), (19, 19), (5, 19)])
+    }
+    # cut narrow holes
+    for i in range(6, 19, 2):
+        obstacles[f"hole_{i}"] = Polygon([(i, 9), (i+0.5, 9), (i+0.5, 10), (i, 10)])
+    start = (6.0, 2.0)
+    goal = (18.0, 22.0)
+    return {"obstacles": obstacles, "start": start, "goal": goal}
 
-    # --- Easy ---
-    def get_easy_1(self):
-        return {
-            "block1": Polygon([(5, 5), (7, 5), (7, 7), (5, 7)]),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    def get_easy_2(self):
-        return {
-            "block1": Polygon([(6, 4), (9, 4), (9, 8), (6, 8)]),
-            "block2": Polygon([(13, 10), (16, 10), (16, 14), (13, 14)]),
-            "start": Point(3, 3).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    # --- Medium ---
-    def get_medium_1(self):
-        return {
-            "L1": Polygon([(5, 5), (10, 5), (10, 10), (5, 10)]),
-            "R1": Polygon([(13, 5), (18, 5), (18, 10), (13, 10)]),
-            "middle": Polygon([(10.5, 6), (12.5, 6), (12.5, 9), (10.5, 9)]),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    def get_medium_2(self):
-        return {
-            "L2": Polygon([(4, 13), (8, 13), (8, 18), (4, 18)]),
-            "R2": Polygon([(15, 13), (19, 13), (19, 18), (15, 18)]),
-            "trap": Polygon([(10.5, 14), (12.5, 14), (12.5, 15), (10.5, 15)]),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    # --- Hard ---
-    def get_hard_2(self):
-        return {
-            "maze1": Polygon([(5, 5), (15, 5), (15, 6), (5, 6)]),
-            "maze2": Polygon([(5, 7), (15, 7), (15, 8), (5, 8)]),
-            "maze3": Polygon([(5, 9), (15, 9), (15, 10), (5, 10)]),
-            "maze4": Polygon([(5, 11), (15, 11), (15, 12), (5, 12)]),
-            "wall_left": LineString([(0, 0), (0, 23)]).buffer(0.5),
-            "wall_right": LineString([(23, 0), (23, 23)]).buffer(0.5),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    def get_hard_3(self):
-        return {
-            "trap1": Polygon([(8, 11), (9, 11), (9, 12), (8, 12)]),
-            "trap2": Polygon([(14, 11), (15, 11), (15, 12), (14, 12)]),
-            "bar1": Polygon([(10, 0), (11, 0), (11, 10), (10, 10)]),
-            "bar2": Polygon([(12, 13), (13, 13), (13, 23), (12, 23)]),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    # --- Very Hard ---
-    def get_very_hard_1(self):
-        scene = {
-            f"maze_{i}": Polygon([(3, i*2), (20, i*2), (20, i*2+1), (3, i*2+1)])
-            for i in range(1, 9, 2)
-        }
-        scene["gap_left"] = Polygon([(6, 4), (7, 4), (7, 5), (6, 5)])
-        scene["gap_right"] = Polygon([(16, 6), (17, 6), (17, 7), (16, 7)])
-        scene["start"] = Point(2, 2).buffer(0.8)
-        scene["goal"] = Point(21, 21).buffer(0.8)
-        return scene
-
-    def get_very_hard_2(self):
-        bar = Polygon([(0, 0), (8, 0), (8, 1), (0, 1)])
-        rotated_bar = rotate(bar, 45, origin=(11, 11))
-        return {
-            "twist_bar": rotated_bar,
-            "side_block": Polygon([(15, 15), (19, 15), (19, 19), (15, 19)]),
-            "start": Point(2, 2).buffer(0.8),
-            "goal": Point(21, 21).buffer(0.8)
-        }
-
-    # --- Zugriff auf alles ---
-    def get_all_scenes(self):
-        methods = [m for m in dir(self) if m.startswith("get_") and callable(getattr(self, m))]
-        return {m: getattr(self, m)() for m in methods}
-
-    def create_environment(env_name="get_very_easy_1"):
-        """
-        Erzeugt eine Umgebung aus der Klasse TestEnvironments.
-        Übergabe z. B.: "get_easy_2", "get_medium_1", ...
-        """
-        envs = TestEnvironments()
-        if hasattr(envs, env_name):
-            content = getattr(envs, env_name)()
-            return CollisionChecker(content, limits=envs.limits)
-        else:
-            raise ValueError(f"Umgebung '{env_name}' nicht gefunden.")
-
+def get_all_environments():
+    return {
+        "trap": env_1_trap(),
+        "bottleneck": env_2_bottleneck(),
+        "fat_bottleneck": env_3_fat_bottleneck(),
+        "robot_shapes": env_4_robot_shapes(),
+        "twist_gap": env_5_twist_gap(),
+        "dense_walls": env_6_dense_walls(),
+        "micro_passages": env_7_micro_passages()
+    }
