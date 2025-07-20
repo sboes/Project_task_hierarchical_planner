@@ -1,68 +1,86 @@
-# coding: utf-8
-
-"""
-HierarchicalPRM: Combines a main planner (e.g., VisPRM) with a sub-planner (e.g., BasicPRM)
-Course: Innovative Programmiermethoden für Industrieroboter (KIT)
-"""
-
-from Lectures.IPPRMBase import PRMBase
 import networkx as nx
+import copy
 from Lectures.IPPerfMonitor import IPPerfMonitor
+from scipy.spatial import cKDTree
+import numpy as np
 
-class HierarchicalPRM(PRMBase):
+class HierarchicalPRM:
+    def __init__(self, collisionChecker, mainPlannerFactory, subPlannerFactory=None):
+        self._collisionChecker = collisionChecker
+        self.mainPlannerFactory = mainPlannerFactory
+        self.subPlannerFactory = subPlannerFactory
+        self.solution = None
 
-    def __init__(self, _collChecker):
-        super(HierarchicalPRM, self).__init__(_collChecker)
-        self.graph = nx.Graph()
-        self.solution = []
+        self.graphMain = None
+        self.graphValidated = None
+        self.graph = None
+        self.statsHandler = None
+        self.subPlanner = None
 
     @IPPerfMonitor
     def planPath(self, startList, goalList, config):
-        """
-        config["mainPlanner"]: class reference to global planner (e.g., VisPRM)
-        config["mainConfig"]: config dict for global planner
-        config["subPlanner"]: class reference to sub-planner (e.g., BasicPRM)
-        config["subConfig"]: config dict for sub-planner
-        """
-        # 0. extract planner classes and configs
-        mainClass = config["mainPlanner"]
-        mainConfig = config["mainConfig"]
-        subClass = config["subPlanner"]
-        subConfig = config["subConfig"]
-
-        # 1. reset graph
-        self.graph.clear()
-
-        # 2. check start/goal validity
         checkedStartList, checkedGoalList = self._checkStartGoal(startList, goalList)
 
-        # 3. build main planner roadmap
-        mainPlanner = mainClass(self._collisionChecker)
-        mainPlanner._learnRoadmap(mainConfig["ntry"])
-        self.graph = mainPlanner.graph.copy()
-        posList = nx.get_node_attributes(self.graph, 'pos')
+        print("\n📌 [Step 3] Creating MainPlanner and learning roadmap")
+        mainPlanner = self.mainPlannerFactory(self._collisionChecker)
+        mainPlanner._learnRoadmap(config["ntry"])
+        self.graphMain = copy.deepcopy(mainPlanner.graph)
+        self.statsHandler = getattr(mainPlanner, "statsHandler", None)
+        print(f"🧠 MainPlanner learned: {self.graphMain.number_of_nodes()} nodes, {self.graphMain.number_of_edges()} edges")
 
-        # 4. prune edges using sub-planner
-        for u, v in list(self.graph.edges()):
-            posU = self.graph.nodes[u]['pos']
-            posV = self.graph.nodes[v]['pos']
-            subPlanner = subClass(self._collisionChecker)
-            path = subPlanner.planPath([posU], [posV], subConfig)
-            if not path:
-                self.graph.remove_edge(u, v)
+        print("🔍 [Step 4] Validating with SubPlanner...")
+        self.graphValidated = copy.deepcopy(self.graphMain)
+        removed = 0
+        if self.subPlannerFactory:
+            self.subPlanner = self.subPlannerFactory(self._collisionChecker)
+            for u, v in list(self.graphValidated.edges()):
+                pos_u = self.graphValidated.nodes[u]["pos"]
+                pos_v = self.graphValidated.nodes[v]["pos"]
+                if not self._edgeValidWithSubPlanner(pos_u, pos_v):
+                    self.graphValidated.remove_edge(u, v)
+                    removed += 1
+        print(f"⚠️ {removed} edges removed by SubPlanner.")
+        print(f"📊 Validated Graph: {self.graphValidated.number_of_nodes()} nodes, {self.graphValidated.number_of_edges()} edges")
 
-        # 5. connect start/goal
-        for name, pos in [("start", checkedStartList[0]), ("goal", checkedGoalList[0])]:
-            self.graph.add_node(name, pos=pos)
-            for node, nodePos in posList.items():
-                if not self._collisionChecker.lineInCollision(pos, nodePos):
-                    self.graph.add_edge(name, node)
-                    break
+        print("🔗 [Step 5] Connecting start/goal")
+        self.graph = copy.deepcopy(self.graphValidated)
+        self._connectStartGoal(self.graph, checkedStartList[0], checkedGoalList[0])
+        print(f"🧷 Start/Goal verbunden. Finaler Graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges")
 
-        # 6. plan final path
         try:
             self.solution = nx.shortest_path(self.graph, "start", "goal")
+            print("✅ Pfad gefunden!")
         except:
+            print("❌ Kein Pfad gefunden.")
             self.solution = []
 
         return self.solution
+
+    def _checkStartGoal(self, startList, goalList):
+        return startList, goalList
+
+    def _connectStartGoal(self, graph, start, goal):
+        pos = nx.get_node_attributes(graph, "pos")
+        if not pos:
+            return
+
+        tree = cKDTree(list(pos.values()))
+        keys = list(pos.keys())
+
+        for label, pt in zip(["start", "goal"], [start, goal]):
+            _, idxs = tree.query(pt, k=min(5, len(keys)))
+            if not isinstance(idxs, (list, np.ndarray)):
+                idxs = [idxs]
+            for i in idxs:
+                if i >= len(keys):
+                    continue
+                if not self._collisionChecker.lineInCollision(pt, pos[keys[i]]):
+                    graph.add_node(label, pos=pt)
+                    graph.add_edge(label, keys[i])
+                    break
+
+    def _edgeValidWithSubPlanner(self, pos1, pos2):
+        if hasattr(self.subPlanner, "_edgeValid"):
+            return self.subPlanner._edgeValid(pos1, pos2)
+        else:
+            return not self._collisionChecker.lineInCollision(pos1, pos2)
