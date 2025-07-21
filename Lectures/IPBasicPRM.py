@@ -123,3 +123,47 @@ class BasicPRM(IPPRMBase.PRMBase):
         except:
             return []
         return path
+
+            # Erweiterung für HierarchicalPRM-Kompatibilität
+        def reset(self):
+            self.graph.clear()
+    
+        def setSamplingRegion(self, pos1, pos2, margin=0.1):
+            self._region_min = np.minimum(pos1, pos2) - margin
+            self._region_max = np.maximum(pos1, pos2) + margin
+    
+        def buildRoadmap(self, numNodes):
+            self.reset()
+            radius = 2.0  # oder konfigurierbar machen
+            nodeID = 1
+            count = 0
+            while count < numNodes:
+                q = self._getRandomFreePosition()
+                if np.all(q >= self._region_min) and np.all(q <= self._region_max):
+                    self.graph.add_node(nodeID, pos=q)
+                    neighbors = self._nearestNeighbours(q, radius)
+                    for neighbor in neighbors:
+                        if not self._collisionChecker.lineInCollision(q, neighbor[1]['pos']):
+                            self.graph.add_edge(nodeID, neighbor[0])
+                    nodeID += 1
+                    count += 1
+    
+        def query(self, start_pos, goal_pos):
+            self.graph.add_node("start", pos=start_pos)
+            self.graph.add_node("goal", pos=goal_pos)
+            radius = 2.0
+    
+            for node, data in self.graph.nodes(data=True):
+                if node in ["start", "goal"]:
+                    continue
+                if not self._collisionChecker.lineInCollision(start_pos, data["pos"]):
+                    self.graph.add_edge("start", node)
+                if not self._collisionChecker.lineInCollision(goal_pos, data["pos"]):
+                    self.graph.add_edge("goal", node)
+    
+            try:
+                path = nx.shortest_path(self.graph, "start", "goal")
+                return True, [self.graph.nodes[n]["pos"] for n in path]
+            except:
+                return False, []
+    

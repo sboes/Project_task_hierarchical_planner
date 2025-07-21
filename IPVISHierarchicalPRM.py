@@ -49,7 +49,7 @@ def hierarchicalPRMVisualizeLazySteps(planner, axList, nodeSize=100):
         axList[1].set_title("Step 2: PRM (vor Validierung)")
         axList[1].grid(True)
 
-    # Step 3: Finaler Graph + Lazy-Farben
+    # Step 3: Finaler Graph + Lazy-Farben + SubPlanner Ergänzungen
     if planner.graph and axList[2]:
         graph = planner.graph
         pos = nx.get_node_attributes(graph, 'pos')
@@ -83,6 +83,18 @@ def hierarchicalPRMVisualizeLazySteps(planner, axList, nodeSize=100):
                         tmpG.add_edge(u, v)
                     nx.draw_networkx_edges(tmpG, pos, edge_color=color, width=5, alpha=alpha, ax=axList[2])
 
+        # ➕ Neue Visualisierung: Entfernte Kanten (wegen Subplanner fehlgeschlagen)
+        if hasattr(planner, "failed_edges"):
+            for u, v in planner.failed_edges:
+                if u in pos and v in pos:
+                    axList[2].plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]],
+                                   linestyle='dashed', color='red', linewidth=2, alpha=0.5)
+
+        # ➕ Neue Visualisierung: Injected Nodes vom Subplanner
+        if hasattr(planner, "local_nodes"):
+            for nid, p in planner.local_nodes:
+                axList[2].scatter(p[0], p[1], s=nodeSize*0.8, c='orange', label='Local Node')
+
         # Pfad
         if planner.solution:
             Gsp = nx.subgraph(graph, planner.solution)
@@ -96,10 +108,33 @@ def hierarchicalPRMVisualizeLazySteps(planner, axList, nodeSize=100):
             nx.draw_networkx_nodes(graph, pos, nodelist=["goal"], node_color="#dd0000", node_size=nodeSize, ax=axList[2])
             nx.draw_networkx_labels(graph, pos, labels={"goal": "G"}, ax=axList[2])
 
-        axList[2].set_title("Step 3: Final mit Lazy-Farben + Pfad")
+        axList[2].set_title("Step 3: Final mit Lazy + lokale Subplanung")
+        axList[2].legend()
         axList[2].grid(True)
 
+def hierarchicalPRMVisualizeBasicSingleAx(planner, path, ax, nodeSize=30):
+    import networkx as nx
+    from matplotlib import pyplot as plt
 
+    if hasattr(planner, 'statsHandler') and planner.statsHandler:
+        graph = planner.statsHandler.graph
+        pos = nx.get_node_attributes(graph, 'pos')
+        nx.draw_networkx_nodes(graph, pos=pos, ax=ax, alpha=0.1,
+                               node_size=nodeSize, node_color='skyblue')
+        nx.draw_networkx_edges(graph, pos=pos, ax=ax, alpha=0.1, edge_color='orange')
+
+    pos = nx.get_node_attributes(planner.graph, 'pos')
+    nx.draw_networkx_nodes(planner.graph, pos=pos, ax=ax,
+                           alpha=0.4, node_size=nodeSize, node_color='blue')
+    nx.draw_networkx_edges(planner.graph, pos=pos, ax=ax,
+                           alpha=0.4, edge_color='gray')
+
+    if path:
+        path_coords = [planner.graph.nodes[p]['pos'] for p in path]
+        xs, ys = zip(*path_coords)
+        ax.plot(xs, ys, 'r-', linewidth=2, label="Lösungspfad")
+    ax.set_title("Hierarchical PRM Pfadplanung")
+    ax.legend()
 
 def hierarchicalPRMVisualizeBasicSteps(planner, axList, nodeSize=100):
     import networkx as nx
@@ -128,7 +163,7 @@ def hierarchicalPRMVisualizeBasicSteps(planner, axList, nodeSize=100):
             pass
         axList[1].set_title("Step 2: PRM (vor Validierung)")
 
-    # Step 3: Finaler Graph + Pfad (wie basic)
+    # Step 3: Finaler Graph + Subplanner-Details + Pfad
     if planner.graph:
         graph = planner.graph
         pos = nx.get_node_attributes(graph, 'pos')
@@ -136,7 +171,22 @@ def hierarchicalPRMVisualizeBasicSteps(planner, axList, nodeSize=100):
         nx.draw_networkx_nodes(graph, pos, cmap=plt.cm.Blues, ax=axList[2], node_size=nodeSize)
         nx.draw_networkx_edges(graph, pos, ax=axList[2])
 
-        # Pfad
+        # 🟥 Entfernte Kanten durch SubPlanner
+        if hasattr(planner, "failed_edges") and planner.failed_edges:
+            failedG = nx.Graph()
+            failedG.add_nodes_from(graph.nodes(data=True))
+            for u, v in planner.failed_edges:
+                if u in pos and v in pos:
+                    failedG.add_edge(u, v)
+            nx.draw_networkx_edges(failedG, pos, edge_color='red', style='dashed', width=2, ax=axList[2])
+
+        # 🟧 Lokale Knoten
+        if hasattr(planner, "local_nodes") and planner.local_nodes:
+            node_ids, node_pos = zip(*planner.local_nodes)
+            nx.draw_networkx_nodes(graph, pos=dict(zip(node_ids, node_pos)),
+                                   ax=axList[2], node_color='orange', node_size=nodeSize * 1.2, alpha=0.8)
+
+        # ✅ Pfad
         if planner.solution:
             Gsp = graph.subgraph(planner.solution)
             nx.draw_networkx_nodes(Gsp, pos, node_size=nodeSize * 1.5, node_color='g', ax=axList[2])
@@ -151,6 +201,6 @@ def hierarchicalPRMVisualizeBasicSteps(planner, axList, nodeSize=100):
             nx.draw_networkx_nodes(graph, pos, nodelist=["goal"], node_color="#dd0000",
                                    node_size=nodeSize * 1.5, ax=axList[2])
             nx.draw_networkx_labels(graph, pos, labels={"goal": "G"}, ax=axList[2])
-        axList[2].set_title("Step 3: Final + Pfad")
-        axList[2].grid(True)
 
+        axList[2].set_title("Step 3: Final mit SubPlanner + Pfad")
+        axList[2].grid(True)

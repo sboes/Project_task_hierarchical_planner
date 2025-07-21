@@ -127,4 +127,82 @@ class LazyPRM(PRMBase):
             
         return []
 
+        def reset(self):
+            self.graph.clear()
+            self.collidingEdges = []
+            self.nonCollidingEdges = []
+
+        def setSamplingRegion(self, pos1, pos2, margin=0.1):
+            self._region_min = np.minimum(pos1, pos2) - margin
+            self._region_max = np.maximum(pos1, pos2) + margin
+    
+        def buildRoadmap(self, numNodes):
+            from scipy.spatial.distance import euclidean
+            import random
+            self.reset()
+            nodeID = 0
+            while nodeID < numNodes:
+                q = self._getRandomFreePosition()
+                if np.all(q >= self._region_min) and np.all(q <= self._region_max):
+                    self.graph.add_node(nodeID, pos=q)
+                    nodeID += 1
+    
+            # K-Nächste Nachbarn-Verbindung (Lazy)
+            self._connectKNearest(k=10)
+    
+        def _connectKNearest(self, k=10):
+            import numpy as np
+            from scipy.spatial import cKDTree
+    
+            posDict = nx.get_node_attributes(self.graph, 'pos')
+            keys = list(posDict.keys())
+            positions = np.array([posDict[k] for k in keys])
+            if len(positions) == 0:
+                return
+    
+            tree = cKDTree(positions)
+            for idx, key in enumerate(keys):
+                q = positions[idx]
+                _, neighbor_idxs = tree.query(q, k=k + 1)
+                for ni in neighbor_idxs:
+                    if ni == idx:
+                        continue
+                    u, v = key, keys[ni]
+                    if not self.graph.has_edge(u, v):
+                        self.graph.add_edge(u, v)
+    
+        def query(self, start_pos, goal_pos):
+            self.graph.add_node("start", pos=start_pos)
+            self.graph.add_node("goal", pos=goal_pos)
+    
+            for node, data in self.graph.nodes(data=True):
+                if node in ["start", "goal"]:
+                    continue
+                if not self._collisionChecker.lineInCollision(start_pos, data["pos"]):
+                    self.graph.add_edge("start", node)
+                if not self._collisionChecker.lineInCollision(goal_pos, data["pos"]):
+                    self.graph.add_edge("goal", node)
+    
+            try:
+                path = nx.shortest_path(self.graph, "start", "goal")
+            except:
+                return False, []
+    
+            # Lazy-Evaluation: Kollisionen prüfen
+            valid_path = True
+            for u, v in zip(path[:-1], path[1:]):
+                p1 = self.graph.nodes[u]["pos"]
+                p2 = self.graph.nodes[v]["pos"]
+                if self._collisionChecker.lineInCollision(p1, p2):
+                    valid_path = False
+                    self.collidingEdges.append((u, v))
+                else:
+                    self.nonCollidingEdges.append((u, v))
+    
+            if valid_path:
+                return True, [self.graph.nodes[n]["pos"] for n in path]
+            else:
+                return False, []
+    
+
     
